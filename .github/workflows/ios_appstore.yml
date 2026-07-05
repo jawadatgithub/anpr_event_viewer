@@ -216,7 +216,7 @@ jobs:
           echo "Installed signing identities:"
           security find-identity -v -p codesigning
 
-      - name: Patch iOS bundle ID, display name, and manual signing
+      - name: Patch iOS bundle ID, display name, privacy strings, and manual signing
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
@@ -277,19 +277,41 @@ jobs:
 
           plist = info_plist.read_text()
 
-          if "<key>CFBundleDisplayName</key>" in plist:
-              plist = re.sub(
-                  r"<key>CFBundleDisplayName</key>\s*<string>.*?</string>",
-                  f"<key>CFBundleDisplayName</key>\n\t<string>{display_name}</string>",
-                  plist,
-                  flags=re.S,
-              )
-          else:
-              plist = plist.replace(
-                  "<dict>",
-                  f"<dict>\n\t<key>CFBundleDisplayName</key>\n\t<string>{display_name}</string>",
-                  1,
-              )
+          def set_plist_string(plist_text, key, value):
+              pattern = rf"<key>{re.escape(key)}</key>\s*<string>.*?</string>"
+              replacement = f"<key>{key}</key>\n\t<string>{value}</string>"
+
+              if re.search(pattern, plist_text, flags=re.S):
+                  return re.sub(pattern, replacement, plist_text, flags=re.S)
+
+              if "</dict>" not in plist_text:
+                  raise SystemExit("Invalid Info.plist: missing </dict>.")
+
+              return plist_text.replace("</dict>", f"\t{replacement}\n</dict>", 1)
+
+          plist = set_plist_string(
+              plist,
+              "CFBundleDisplayName",
+              display_name,
+          )
+
+          plist = set_plist_string(
+              plist,
+              "NSPhotoLibraryUsageDescription",
+              "Import ANPR payload files or related vehicle and plate images that you select for local review.",
+          )
+
+          plist = set_plist_string(
+              plist,
+              "NSCameraUsageDescription",
+              "Capture or attach vehicle and plate images only when you choose to use camera-based import for ANPR event review.",
+          )
+
+          plist = set_plist_string(
+              plist,
+              "NSLocationWhenInUseUsageDescription",
+              "Attach location context to ANPR events only when you choose to use location-based event review.",
+          )
 
           info_plist.write_text(plist)
 
@@ -297,7 +319,16 @@ jobs:
           print("Team ID:", team_id)
           print("Provisioning profile:", profile_name)
           print("Display name:", display_name)
+          print("Added privacy strings:")
+          print("- NSPhotoLibraryUsageDescription")
+          print("- NSCameraUsageDescription")
+          print("- NSLocationWhenInUseUsageDescription")
           PY
+
+          echo "Final Info.plist privacy keys:"
+          /usr/libexec/PlistBuddy -c "Print :NSPhotoLibraryUsageDescription" ios/Runner/Info.plist
+          /usr/libexec/PlistBuddy -c "Print :NSCameraUsageDescription" ios/Runner/Info.plist
+          /usr/libexec/PlistBuddy -c "Print :NSLocationWhenInUseUsageDescription" ios/Runner/Info.plist
 
       - name: Create ExportOptions.plist
         env:
