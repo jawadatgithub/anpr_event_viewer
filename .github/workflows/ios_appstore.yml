@@ -41,7 +41,7 @@ jobs:
       - name: Install Flutter dependencies
         run: flutter pub get
 
-      - name: Ensure iOS platform files and Podfile exist
+      - name: Ensure iOS platform files, Podfile, and configs exist
         run: |
           echo "Checking iOS project files..."
 
@@ -50,21 +50,92 @@ jobs:
             flutter create --platforms=ios --org com.insysout .
           fi
 
-          if [ ! -f ios/Podfile ]; then
-            echo "ios/Podfile is missing. Regenerating iOS platform files..."
+          if [ ! -d ios/Runner.xcodeproj ]; then
+            echo "ios/Runner.xcodeproj is missing. Regenerating iOS platform files..."
             flutter create --platforms=ios --org com.insysout .
+          fi
+
+          if [ ! -f ios/Runner/Info.plist ]; then
+            echo "ios/Runner/Info.plist is missing. Regenerating iOS platform files..."
+            flutter create --platforms=ios --org com.insysout .
+          fi
+
+          echo "Running flutter pub get again after iOS platform check..."
+          flutter pub get
+
+          echo "Ensuring Flutter generated iOS config exists..."
+          if [ ! -f ios/Flutter/Generated.xcconfig ]; then
+            echo "ERROR: ios/Flutter/Generated.xcconfig missing."
+            echo "Flutter pub get should have generated it."
+            ls -la ios/Flutter || true
+            exit 1
+          fi
+
+          if [ ! -f ios/Podfile ]; then
+            echo "ios/Podfile is missing. Creating standard Flutter iOS Podfile..."
+
+            cat > ios/Podfile <<'PODFILE'
+          platform :ios, '13.0'
+
+          ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+
+          project 'Runner', {
+            'Debug' => :debug,
+            'Profile' => :release,
+            'Release' => :release,
+          }
+
+          def flutter_root
+            generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
+            unless File.exist?(generated_xcode_build_settings_path)
+              raise "#{generated_xcode_build_settings_path} must exist. If you're running pod install manually, make sure flutter pub get is executed first"
+            end
+
+            File.foreach(generated_xcode_build_settings_path) do |line|
+              matches = line.match(/FLUTTER_ROOT\=(.*)/)
+              return matches[1].strip if matches
+            end
+
+            raise "FLUTTER_ROOT not found in #{generated_xcode_build_settings_path}. Try deleting Generated.xcconfig, then run flutter pub get"
+          end
+
+          require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
+
+          flutter_ios_podfile_setup
+
+          target 'Runner' do
+            use_frameworks!
+            use_modular_headers!
+
+            flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+
+            target 'RunnerTests' do
+              inherit! :search_paths
+            end
+          end
+
+          post_install do |installer|
+            installer.pods_project.targets.each do |target|
+              flutter_additional_ios_build_settings(target)
+
+              target.build_configurations.each do |config|
+                config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+              end
+            end
+          end
+          PODFILE
           fi
 
           echo "Final iOS folder:"
           ls -la ios
 
+          echo "Final Podfile:"
+          sed -n '1,200p' ios/Podfile
+
           if [ ! -f ios/Podfile ]; then
-            echo "ERROR: ios/Podfile still missing after flutter create."
+            echo "ERROR: ios/Podfile still missing."
             exit 1
           fi
-
-          echo "Podfile exists:"
-          sed -n '1,120p' ios/Podfile
 
       - name: Generate launcher icons
         run: |
@@ -128,7 +199,7 @@ jobs:
 
           pbxproj = Path("ios/Runner.xcodeproj/project.pbxproj")
           if not pbxproj.exists():
-              raise SystemExit("Missing ios/Runner.xcodeproj/project.pbxproj. iOS platform files were not generated.")
+              raise SystemExit("Missing ios/Runner.xcodeproj/project.pbxproj.")
 
           text = pbxproj.read_text()
 
