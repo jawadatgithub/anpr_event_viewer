@@ -41,6 +41,31 @@ jobs:
       - name: Install Flutter dependencies
         run: flutter pub get
 
+      - name: Ensure iOS platform files and Podfile exist
+        run: |
+          echo "Checking iOS project files..."
+
+          if [ ! -d ios ]; then
+            echo "ios folder is missing. Creating iOS platform files..."
+            flutter create --platforms=ios --org com.insysout .
+          fi
+
+          if [ ! -f ios/Podfile ]; then
+            echo "ios/Podfile is missing. Regenerating iOS platform files..."
+            flutter create --platforms=ios --org com.insysout .
+          fi
+
+          echo "Final iOS folder:"
+          ls -la ios
+
+          if [ ! -f ios/Podfile ]; then
+            echo "ERROR: ios/Podfile still missing after flutter create."
+            exit 1
+          fi
+
+          echo "Podfile exists:"
+          sed -n '1,120p' ios/Podfile
+
       - name: Generate launcher icons
         run: |
           if grep -q "flutter_launcher_icons" pubspec.yaml; then
@@ -103,7 +128,7 @@ jobs:
 
           pbxproj = Path("ios/Runner.xcodeproj/project.pbxproj")
           if not pbxproj.exists():
-              raise SystemExit("Missing ios/Runner.xcodeproj/project.pbxproj. Commit the ios folder first.")
+              raise SystemExit("Missing ios/Runner.xcodeproj/project.pbxproj. iOS platform files were not generated.")
 
           text = pbxproj.read_text()
 
@@ -143,6 +168,9 @@ jobs:
           pbxproj.write_text(text)
 
           info_plist = Path("ios/Runner/Info.plist")
+          if not info_plist.exists():
+              raise SystemExit("Missing ios/Runner/Info.plist.")
+
           plist = info_plist.read_text()
 
           if "<key>CFBundleDisplayName</key>" in plist:
@@ -197,10 +225,17 @@ jobs:
           </plist>
           EOF
 
+          echo "ExportOptions.plist:"
           cat ios/ExportOptions.plist
 
       - name: Install CocoaPods dependencies
         run: |
+          if [ ! -f ios/Podfile ]; then
+            echo "ERROR: ios/Podfile missing before pod install."
+            ls -la ios || true
+            exit 1
+          fi
+
           cd ios
           pod install --repo-update
 
