@@ -19,16 +19,49 @@ env:
 
 jobs:
   build-ios:
-    runs-on: macos-15
+    runs-on: macos-26
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Select Xcode
+      - name: Select Xcode 26 or later
         run: |
-          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          echo "Available Xcode apps:"
+          ls -la /Applications | grep Xcode || true
+
+          echo "Current Xcode before selection:"
+          xcodebuild -version || true
+
+          SELECTED_XCODE=""
+
+          for XCODE_APP in /Applications/Xcode*.app; do
+            if [ -d "$XCODE_APP" ]; then
+              VERSION=$("$XCODE_APP/Contents/Developer/usr/bin/xcodebuild" -version | head -n 1 | awk '{print $2}')
+              MAJOR=$(echo "$VERSION" | cut -d. -f1)
+
+              echo "Found $XCODE_APP version $VERSION"
+
+              if [ "$MAJOR" -ge 26 ]; then
+                SELECTED_XCODE="$XCODE_APP"
+              fi
+            fi
+          done
+
+          if [ -z "$SELECTED_XCODE" ]; then
+            echo "ERROR: No Xcode 26 or later found on this runner."
+            echo "Apple requires Xcode 26+ / iOS 26 SDK+ for App Store upload."
+            exit 1
+          fi
+
+          echo "Selecting Xcode: $SELECTED_XCODE"
+          sudo xcode-select -s "$SELECTED_XCODE/Contents/Developer"
+
+          echo "Selected Xcode:"
           xcodebuild -version
+
+          echo "Available iOS SDKs:"
+          xcodebuild -showsdks | grep iphoneos || true
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -276,7 +309,7 @@ jobs:
           <plist version="1.0">
           <dict>
             <key>method</key>
-            <string>app-store</string>
+            <string>app-store-connect</string>
             <key>teamID</key>
             <string>${APPLE_TEAM_ID}</string>
             <key>signingStyle</key>
@@ -316,8 +349,14 @@ jobs:
       - name: Run tests
         run: flutter test
 
-      - name: Build signed IPA
+      - name: Build signed IPA with Xcode 26 SDK
         run: |
+          echo "Final Xcode before build:"
+          xcodebuild -version
+
+          echo "Final iOS SDK before build:"
+          xcodebuild -showsdks | grep iphoneos || true
+
           flutter build ipa \
             --release \
             --build-name=1.0.0 \
@@ -350,6 +389,9 @@ jobs:
           APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
           APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
         run: |
+          echo "Xcode used for upload:"
+          xcodebuild -version
+
           xcrun altool \
             --upload-app \
             --type ios \
