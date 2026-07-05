@@ -1,0 +1,58 @@
+name: insysout_anpr_event_viewer
+description: Minimal ANPR Event Viewer by InSysOut supporting JSON, XML, CSV, SQL, Protobuf, Arabic fields, base64/URL images, local files, and Google Drive import.
+publish_to: 'none'
+version: 0.4.0+4
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_riverpod: ^2.6.1
+  intl: ^0.19.0
+  uuid: ^4.5.1
+  xml: ^6.5.0
+  file_picker: ^8.3.7
+  google_sign_in: ^6.2.2
+  googleapis: ^13.2.0
+  extension_google_sign_in_as_googleapis_auth: ^2.0.13
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.14.4
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/samples/sample_event.json
+    - assets/samples/sample_event.xml
+    - assets/branding/insysout_logo.png
+    - assets/branding/insysout_full_logo_512.png
+    - assets/branding/insysout_full_logo_1024.png
+    - assets/branding/insysout_app_icon.png
+    - assets/branding/insysout_app_icon_transparent_1024.png
+    - assets/branding/insysout_app_icon_solid_1024.png
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  image_path: "assets/branding/insysout_app_icon.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#050A14"
+  adaptive_icon_foreground: "assets/branding/insysout_app_icon.png"
+  web:
+    generate: true
+    image_path: "assets/branding/insysout_app_icon.png"
+    background_color: "#050A14"
+    theme_color: "#1D4ED8"
+  windows:
+    generate: true
+    image_path: "assets/branding/insysout_app_icon.png"
+    icon_size: 48
+  macos:
+    generate: true
+    image_path: "assets/branding/insysout_app_icon.png"
