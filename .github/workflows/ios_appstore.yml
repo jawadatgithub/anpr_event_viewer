@@ -223,6 +223,7 @@ jobs:
           python3 <<'PY'
           from pathlib import Path
           import os
+          import plistlib
           import re
 
           bundle_id = os.environ["BUNDLE_ID"]
@@ -275,55 +276,38 @@ jobs:
           if not info_plist.exists():
               raise SystemExit("Missing ios/Runner/Info.plist.")
 
-          plist = info_plist.read_text()
+          with info_plist.open("rb") as f:
+              plist = plistlib.load(f)
 
-          def set_plist_string(plist_text, key, value):
-              pattern = rf"<key>{re.escape(key)}</key>\s*<string>.*?</string>"
-              replacement = f"<key>{key}</key>\n\t<string>{value}</string>"
+          plist["CFBundleDisplayName"] = display_name
 
-              if re.search(pattern, plist_text, flags=re.S):
-                  return re.sub(pattern, replacement, plist_text, flags=re.S)
-
-              if "</dict>" not in plist_text:
-                  raise SystemExit("Invalid Info.plist: missing </dict>.")
-
-              return plist_text.replace("</dict>", f"\t{replacement}\n</dict>", 1)
-
-          plist = set_plist_string(
-              plist,
-              "CFBundleDisplayName",
-              display_name,
+          plist["NSPhotoLibraryUsageDescription"] = (
+              "Import ANPR payload files or related vehicle and plate images that you select for local review."
           )
 
-          plist = set_plist_string(
-              plist,
-              "NSPhotoLibraryUsageDescription",
-              "Import ANPR payload files or related vehicle and plate images that you select for local review.",
+          plist["NSCameraUsageDescription"] = (
+              "Capture or attach vehicle and plate images only when you choose to use camera-based import for ANPR event review."
           )
 
-          plist = set_plist_string(
-              plist,
-              "NSCameraUsageDescription",
-              "Capture or attach vehicle and plate images only when you choose to use camera-based import for ANPR event review.",
+          plist["NSLocationWhenInUseUsageDescription"] = (
+              "Attach location context to ANPR events only when you choose to use location-based event review."
           )
 
-          plist = set_plist_string(
-              plist,
-              "NSLocationWhenInUseUsageDescription",
-              "Attach location context to ANPR events only when you choose to use location-based event review.",
-          )
-
-          info_plist.write_text(plist)
+          with info_plist.open("wb") as f:
+              plistlib.dump(plist, f, fmt=plistlib.FMT_XML, sort_keys=False)
 
           print("Bundle ID:", bundle_id)
           print("Team ID:", team_id)
           print("Provisioning profile:", profile_name)
           print("Display name:", display_name)
-          print("Added privacy strings:")
+          print("Added root Info.plist privacy strings:")
           print("- NSPhotoLibraryUsageDescription")
           print("- NSCameraUsageDescription")
           print("- NSLocationWhenInUseUsageDescription")
           PY
+
+          echo "Validate Info.plist syntax:"
+          plutil -lint ios/Runner/Info.plist
 
           echo "Final Info.plist privacy keys:"
           /usr/libexec/PlistBuddy -c "Print :NSPhotoLibraryUsageDescription" ios/Runner/Info.plist
