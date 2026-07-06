@@ -3,51 +3,53 @@ import 'dart:typed_data';
 
 class ImportedPayload {
   final String name;
-  final Uint8List bytes;
-  final String? contentType;
-  final String? source;
+  final String parserInput;
+  final String resolvedContentType;
+  final int byteLength;
+  final bool isBinary;
 
   const ImportedPayload({
     required this.name,
-    required this.bytes,
-    this.contentType,
-    this.source,
+    required this.parserInput,
+    required this.resolvedContentType,
+    this.byteLength = 0,
+    this.isBinary = false,
   });
 
-  bool get isProbablyBinary {
+  factory ImportedPayload.fromBytes({
+    required String name,
+    required Uint8List bytes,
+  }) {
+    final contentType = contentTypeForFileName(name);
+    final binary = isBinaryContentType(contentType);
+
+    return ImportedPayload(
+      name: name,
+      parserInput: binary ? base64Encode(bytes) : utf8.decode(bytes, allowMalformed: true),
+      resolvedContentType: contentType,
+      byteLength: bytes.length,
+      isBinary: binary,
+    );
+  }
+
+  static String contentTypeForFileName(String name) {
     final lower = name.toLowerCase();
-    final ct = contentType?.toLowerCase() ?? '';
-    return ct.contains('protobuf') ||
-        ct.contains('octet-stream') ||
-        lower.endsWith('.pb') ||
-        lower.endsWith('.proto.bin') ||
-        lower.endsWith('.protobuf') ||
-        lower.endsWith('.bin');
+
+    if (lower.endsWith('.json')) return 'application/json';
+    if (lower.endsWith('.xml')) return 'application/xml';
+    if (lower.endsWith('.csv')) return 'text/csv';
+    if (lower.endsWith('.sql')) return 'text/sql';
+
+    if (lower.endsWith('.protobuf')) return 'application/protobuf';
+    if (lower.endsWith('.proto')) return 'application/protobuf';
+    if (lower.endsWith('.pb')) return 'application/protobuf';
+    if (lower.endsWith('.bin')) return 'application/protobuf';
+
+    return 'auto';
   }
 
-  dynamic get parserInput {
-    if (isProbablyBinary) return bytes;
-    return utf8.decode(bytes, allowMalformed: true);
+  static bool isBinaryContentType(String contentType) {
+    final lower = contentType.toLowerCase();
+    return lower.contains('protobuf') || lower.contains('octet-stream');
   }
-
-  String get resolvedContentType {
-    final explicit = contentType?.trim();
-    if (explicit != null && explicit.isNotEmpty) return explicit;
-    return guessContentTypeFromName(name);
-  }
-}
-
-String guessContentTypeFromName(String fileName) {
-  final lower = fileName.toLowerCase();
-  if (lower.endsWith('.json')) return 'application/json';
-  if (lower.endsWith('.xml')) return 'application/xml';
-  if (lower.endsWith('.csv')) return 'text/csv';
-  if (lower.endsWith('.sql')) return 'application/sql';
-  if (lower.endsWith('.pb') ||
-      lower.endsWith('.protobuf') ||
-      lower.endsWith('.proto.bin') ||
-      lower.endsWith('.bin')) {
-    return 'application/x-protobuf';
-  }
-  return 'auto';
 }

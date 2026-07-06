@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/normalized_anpr_event.dart';
 import '../parsers/anpr_payload_parser.dart';
 import '../services/imported_payload.dart';
+import '../services/pro_unlock_service.dart';
 
 const int freeDailyEventLimit = 10;
 
@@ -14,7 +15,7 @@ const String proUpgradeMessage =
 final anprRepositoryProvider = Provider((ref) => AnprEventRepository());
 
 final anprEventsProvider = StateNotifierProvider<AnprEventsNotifier, List<NormalizedAnprEvent>>(
-  (ref) => AnprEventsNotifier(ref.read(anprRepositoryProvider)),
+  (ref) => AnprEventsNotifier(ref.read(anprRepositoryProvider), ref),
 );
 
 class DailyEventLimitExceeded implements Exception {
@@ -38,8 +39,9 @@ class AnprEventRepository {
 
 class AnprEventsNotifier extends StateNotifier<List<NormalizedAnprEvent>> {
   final AnprEventRepository repository;
+  final Ref ref;
 
-  AnprEventsNotifier(this.repository) : super(const []) {
+  AnprEventsNotifier(this.repository, this.ref) : super(const []) {
     loadSamples();
   }
 
@@ -95,6 +97,7 @@ class AnprEventsNotifier extends StateNotifier<List<NormalizedAnprEvent>> {
   }
 
   void _ensureDailyLimit(List<NormalizedAnprEvent> incomingEvents) {
+    if (ref.read(proUnlockControllerProvider).isUnlocked) return;
     final counts = <String, int>{};
 
     for (final event in state) {

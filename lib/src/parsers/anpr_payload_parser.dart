@@ -8,8 +8,19 @@ import 'payload_format.dart';
 import 'sql_anpr_parser.dart';
 import 'xml_anpr_parser.dart';
 
+import 'rasd_protobuf_decoder.dart';
 class AnprPayloadParser {
   static NormalizedAnprEvent parse(dynamic input, {String? contentType}) {
+    final rasdContentType = (contentType ?? '').toLowerCase();
+    if (rasdContentType.contains('protobuf') ||
+        rasdContentType.contains('x-protobuf') ||
+        rasdContentType.contains('octet-stream') ||
+        RasdProtobufDecoder.looksLikeRasdPayload(input)) {
+      final rasdMap = RasdProtobufDecoder.decodeToJsonMap(input);
+      return parse(jsonEncode(rasdMap), contentType: 'application/json');
+    }
+
+
     final format = detectPayloadFormat(input, contentType: contentType);
 
     switch (format) {

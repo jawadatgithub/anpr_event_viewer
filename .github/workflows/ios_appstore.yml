@@ -50,7 +50,6 @@ jobs:
 
           if [ -z "$SELECTED_XCODE" ]; then
             echo "ERROR: No Xcode 26 or later found on this runner."
-            echo "Apple requires Xcode 26+ / iOS 26 SDK+ for App Store upload."
             exit 1
           fi
 
@@ -99,7 +98,6 @@ jobs:
           echo "Ensuring Flutter generated iOS config exists..."
           if [ ! -f ios/Flutter/Generated.xcconfig ]; then
             echo "ERROR: ios/Flutter/Generated.xcconfig missing."
-            echo "Flutter pub get should have generated it."
             ls -la ios/Flutter || true
             exit 1
           fi
@@ -216,7 +214,7 @@ jobs:
           echo "Installed signing identities:"
           security find-identity -v -p codesigning
 
-      - name: Patch iOS bundle ID, display name, privacy strings, and manual signing
+      - name: Patch iOS bundle ID, display name, privacy strings, encryption flag, and manual signing
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
@@ -236,40 +234,25 @@ jobs:
               raise SystemExit("Missing ios/Runner.xcodeproj/project.pbxproj.")
 
           text = pbxproj.read_text()
-
-          text = re.sub(
-              r"PRODUCT_BUNDLE_IDENTIFIER = [^;]+;",
-              f"PRODUCT_BUNDLE_IDENTIFIER = {bundle_id};",
-              text,
-          )
+          text = re.sub(r"PRODUCT_BUNDLE_IDENTIFIER = [^;]+;", f"PRODUCT_BUNDLE_IDENTIFIER = {bundle_id};", text)
 
           def patch_build_settings(match):
               block = match.group(0)
-
               if "PRODUCT_BUNDLE_IDENTIFIER" not in block:
                   return block
-
               block = re.sub(r'\n\s*CODE_SIGN_STYLE = [^;]+;', '', block)
               block = re.sub(r'\n\s*DEVELOPMENT_TEAM = [^;]*;', '', block)
               block = re.sub(r'\n\s*PROVISIONING_PROFILE_SPECIFIER = [^;]*;', '', block)
               block = re.sub(r'\n\s*"?CODE_SIGN_IDENTITY"? = [^;]+;', '', block)
-
               insert = (
                   f'\n\t\t\t\tCODE_SIGN_STYLE = Manual;'
                   f'\n\t\t\t\tDEVELOPMENT_TEAM = {team_id};'
                   f'\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = "{profile_name}";'
                   f'\n\t\t\t\t"CODE_SIGN_IDENTITY" = "Apple Distribution";'
               )
-
               return block.replace("buildSettings = {", "buildSettings = {" + insert, 1)
 
-          text = re.sub(
-              r"buildSettings = \{.*?\n\t\t\t\};",
-              patch_build_settings,
-              text,
-              flags=re.S,
-          )
-
+          text = re.sub(r"buildSettings = \{.*?\n\t\t\t\};", patch_build_settings, text, flags=re.S)
           pbxproj.write_text(text)
 
           info_plist = Path("ios/Runner/Info.plist")
@@ -280,18 +263,10 @@ jobs:
               plist = plistlib.load(f)
 
           plist["CFBundleDisplayName"] = display_name
-
-          plist["NSPhotoLibraryUsageDescription"] = (
-              "Import ANPR payload files or related vehicle and plate images that you select for local review."
-          )
-
-          plist["NSCameraUsageDescription"] = (
-              "Capture or attach vehicle and plate images only when you choose to use camera-based import for ANPR event review."
-          )
-
-          plist["NSLocationWhenInUseUsageDescription"] = (
-              "Attach location context to ANPR events only when you choose to use location-based event review."
-          )
+          plist["NSPhotoLibraryUsageDescription"] = "Import ANPR payload files or related vehicle and plate images that you select for local review."
+          plist["NSCameraUsageDescription"] = "Capture or attach vehicle and plate images only when you choose to use camera-based import for ANPR event review."
+          plist["NSLocationWhenInUseUsageDescription"] = "Attach location context to ANPR events only when you choose to use location-based event review."
+          plist["ITSAppUsesNonExemptEncryption"] = False
 
           with info_plist.open("wb") as f:
               plistlib.dump(plist, f, fmt=plistlib.FMT_XML, sort_keys=False)
@@ -300,19 +275,17 @@ jobs:
           print("Team ID:", team_id)
           print("Provisioning profile:", profile_name)
           print("Display name:", display_name)
-          print("Added root Info.plist privacy strings:")
-          print("- NSPhotoLibraryUsageDescription")
-          print("- NSCameraUsageDescription")
-          print("- NSLocationWhenInUseUsageDescription")
+          print("Added root Info.plist privacy and encryption keys.")
           PY
 
           echo "Validate Info.plist syntax:"
           plutil -lint ios/Runner/Info.plist
 
-          echo "Final Info.plist privacy keys:"
+          echo "Final Info.plist keys:"
           /usr/libexec/PlistBuddy -c "Print :NSPhotoLibraryUsageDescription" ios/Runner/Info.plist
           /usr/libexec/PlistBuddy -c "Print :NSCameraUsageDescription" ios/Runner/Info.plist
           /usr/libexec/PlistBuddy -c "Print :NSLocationWhenInUseUsageDescription" ios/Runner/Info.plist
+          /usr/libexec/PlistBuddy -c "Print :ITSAppUsesNonExemptEncryption" ios/Runner/Info.plist
 
       - name: Create ExportOptions.plist
         env:

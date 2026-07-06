@@ -66,5 +66,13 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Import ANPR payload files or related vehicle and plate images that you select for local review.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Capture or attach vehicle and plate images only when you choose to use camera-based import for ANPR event review.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Attach location context to ANPR events only when you choose to use location-based event review.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

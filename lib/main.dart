@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'src/screens/anpr_events_screen.dart';
+import 'src/theme/app_theme.dart';
 
-void main() => runApp(const ProviderScope(child: AnprEventViewerApp()));
+void main() {
+  runApp(const ProviderScope(child: AnprEventViewerApp()));
+}
 
 class AnprEventViewerApp extends StatelessWidget {
   const AnprEventViewerApp({super.key});
@@ -11,13 +14,9 @@ class AnprEventViewerApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false,
       title: 'InSysOut ANPR Viewer',
-      theme: ThemeData(
-        useMaterial3: true,
-        colorSchemeSeed: const Color(0xFF1D4ED8),
-        brightness: Brightness.dark,
-      ),
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.dark(),
       home: const AnprEventsScreen(),
     );
   }

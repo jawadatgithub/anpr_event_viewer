@@ -5,37 +5,33 @@ import 'package:file_picker/file_picker.dart';
 import 'imported_payload.dart';
 
 class AnprFileImportService {
-  const AnprFileImportService();
-
   Future<List<ImportedPayload>> pickPayloadFiles() async {
     final result = await FilePicker.platform.pickFiles(
       allowMultiple: true,
+      type: FileType.any,
       withData: true,
-      type: FileType.custom,
-      allowedExtensions: const [
-        'json',
-        'xml',
-        'csv',
-        'sql',
-        'pb',
-        'protobuf',
-        'bin',
-        'txt',
-      ],
     );
 
-    if (result == null) return const [];
+    if (result == null || result.files.isEmpty) {
+      return const [];
+    }
 
-    return result.files
-        .where((file) => file.bytes != null && file.bytes!.isNotEmpty)
-        .map(
-          (file) => ImportedPayload(
-            name: file.name,
-            bytes: Uint8List.fromList(file.bytes!),
-            contentType: guessContentTypeFromName(file.name),
-            source: 'file',
-          ),
-        )
-        .toList(growable: false);
+    final payloads = <ImportedPayload>[];
+
+    for (final file in result.files) {
+      final bytes = file.bytes;
+      if (bytes == null || bytes.isEmpty) {
+        continue;
+      }
+
+      payloads.add(
+        ImportedPayload.fromBytes(
+          name: file.name,
+          bytes: Uint8List.fromList(bytes),
+        ),
+      );
+    }
+
+    return payloads;
   }
 }
